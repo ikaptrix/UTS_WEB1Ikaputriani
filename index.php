@@ -1,12 +1,9 @@
 <?php
 session_start();
 
-$error = '';
-
 if (isset($_POST['login'])) {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
-
     if ($username === 'admin' && $password === 'POLGAN MART') {
         $_SESSION['username'] = $username;
         $_SESSION['role'] = 'Dosen';
@@ -15,6 +12,7 @@ if (isset($_POST['login'])) {
     } else {
         $error = 'Username atau password salah!';
     }
+
 }
 ?>
 
