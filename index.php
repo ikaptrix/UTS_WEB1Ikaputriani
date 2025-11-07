@@ -1,10 +1,12 @@
 <?php
 session_start();
 
+$error = '';
+ 
 if (isset($_POST['login'])) {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
-    if ($username === 'admin' && $password === 'POLGAN MART') {
+    if ($username === 'admin' && $password === '123') {
         $_SESSION['username'] = $username;
         $_SESSION['role'] = 'Dosen';
         header('Location: dashboard.php');
@@ -12,7 +14,6 @@ if (isset($_POST['login'])) {
     } else {
         $error = 'Username atau password salah!';
     }
-
 }
 ?>
 
