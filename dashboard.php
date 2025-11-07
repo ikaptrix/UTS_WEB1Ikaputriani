@@ -11,4 +11,11 @@ $products = [
     ["kode" => "K002", "nama" => "Sukro", "harga" => 1000],
     ["kode" => "K005", "nama" => "Chitose", "harga" => 3000],
 ];
+$grandtotal = 0;
+foreach ($products as &$p) {
+    $p['jumlah'] = rand(1,5);
+    $p['total'] = $p['jumlah'] * $p['harga'];
+    $grandtotal += $p['total'];
+}
+unset($p);
 ?>
