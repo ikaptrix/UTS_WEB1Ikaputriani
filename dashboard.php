@@ -19,3 +19,42 @@ foreach ($products as &$p) {
 }
 unset($p);
 ?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Penjualan - POLGAN MART</title>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="brand">--POLGAN MART--</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kode</th>
+                        <th>Nama Barang</th>
+                        <th>Harga</th>
+                        <th>Jumlah</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($products as $p): ?>
+                    <tr>
+                        <td><?= $p["kode"] ?></td>
+                        <td><?= $p["nama"] ?></td>
+                        <td>Rp <?= number_format($p["harga"],0,',','.') ?></td>
+                        <td><?= $p["jumlah"] ?></td>
+                        <td>Rp <?= number_format($p["total"],0,',','.') ?></td>
+                    </tr>
+                    <?php endforeach ?>
+                    <tr class="total-row">
+                        <td colspan="4" style="text-align:right;">Total Belanja</td>
+                        <td>Rp <?= number_format($grandtotal,0,',','.') ?></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
