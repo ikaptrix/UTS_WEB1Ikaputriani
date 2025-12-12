@@ -1,18 +1,30 @@
 <?php
 session_start();
+include "koneksi.php";
 
-$error = '';
- 
-if (isset($_POST['login'])) {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    if ($username === 'admin' && $password === '123') {
-        $_SESSION['username'] = $username;
-        $_SESSION['role'] = 'Dosen';
-        header('Location: dashboard.php');
-        exit;
+if (isset($_SESSION['username'])) {
+    header("Location: dashboard.php");
+    exit;
+}
+$error='';
+if (isset($_POST['x']) && isset($_POST['y'])) {
+    $username = $_POST['x'];
+    $password = $_POST['y'];
+
+    $result = mysqli_query($conn, "SELECT * FROM users WHERE username='$username'");
+
+    if ($row = mysqli_fetch_assoc($result)) {
+        if ($password == $row['password']) {
+            $_SESSION['username'] = $row['username'];
+            $_SESSION['nama'] = $row['nama_lengkap'];
+            $_SESSION['role'] = $row['role'];
+            header("Location: dashboard.php");
+            exit;
+        } else {
+            $error = "Password salah!";
+        }
     } else {
-        $error = 'Username atau password salah!';
+        $error = "Username tidak ditemukan!";
     }
 }
 ?>
@@ -20,7 +32,7 @@ if (isset($_POST['login'])) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Login - POLGAN MART</title>
+    <title>Login POLGAN MART</title>
     <style>
         body {
             background: #f2f2f2;
@@ -102,9 +114,9 @@ if (isset($_POST['login'])) {
         <?php endif; ?>
         <form method="post" action="">
             <div class="form-label">Username</div>
-            <input type="text" name="username" class="form-input" autocomplete="off" required>
+            <input type="text" name="x" class="form-input" autocomplete="off" required>
             <div class="form-label">Password</div>
-            <input type="password" name="password" class="form-input" required>
+            <input type="password" name="y" class="form-input" required>
             <button type="submit" name="login" class="btn">Login</button>
             <button type="reset" class="btn-reset">Batal</button>
         </form>
