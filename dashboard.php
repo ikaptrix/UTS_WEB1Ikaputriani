@@ -1,223 +1,296 @@
 <?php
 session_start();
+include 'koneksi.php';
+
 if (!isset($_SESSION['username'])) {
     header("Location: index.php");
     exit;
 }
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_item'])) {
-        $kode   = trim($_POST['kode'] ?? '');
-        $nama   = trim($_POST['nama'] ?? '');
-        $harga  = (int) ($_POST['harga'] ?? 0);
-        $jumlah = (int) ($_POST['jumlah'] ?? 0);
-        if ($kode !== '' && $nama !== '' && $harga > 0 && $jumlah > 0) {
-            $item = [
-                'kode' => $kode,
-                'nama' => $nama,
-                'harga'=> $harga,
-                'jumlah'=> $jumlah,
-                'total'=> $harga * $jumlah
-            ];
-            if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
-            $_SESSION['cart'][] = $item;
-        } else {
-            $msg_error = "Mohon isi semua field dengan benar";
-        }
+
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
+
+if (isset($_POST['hapus_index'])) {
+    unset($_SESSION['cart'][$_POST['hapus_index']]);
+    $_SESSION['cart'] = array_values($_SESSION['cart']);
+    header("Location: dashboard.php");
+    exit;
+}
+
+$errors = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kode'])) {
+
+    $kode   = $_POST['kode'];
+    $nama   = $_POST['nama'];
+    $harga  = (int) $_POST['harga'];
+    $jumlah = (int) $_POST['jumlah'];
+
+    if ($jumlah <= 0) {
+        $errors[] = "Jumlah tidak valid";
     }
-    if (isset($_POST['clear_cart'])) {
-        $_SESSION['cart'] = [];
-    }
-    if (isset($_POST['cancel'])) {
+
+    if (!$errors) {
+        $_SESSION['cart'][] = [
+            'kode' => $kode,
+            'nama' => $nama,
+            'harga' => $harga,
+            'jumlah' => $jumlah,
+            'lineTotal' => $harga * $jumlah
+        ];
+        header("Location: dashboard.php");
+        exit;
     }
 }
-$cart = $_SESSION['cart'] ?? [];
+
+if (isset($_POST['clear_cart'])) {
+    $_SESSION['cart'] = [];
+    header("Location: dashboard.php");
+    exit;
+}
+
 $grandtotal = 0;
-foreach ($cart as $it) {
-    $grandtotal += $it['total'];
+foreach ($_SESSION['cart'] as $c) {
+    $grandtotal += $c['lineTotal'];
 }
-$diskon = $grandtotal * 0.05; // 5%
-$totalBayar = $grandtotal - $diskon;
-$static_pembelian = [
-    ["kode" => "A001", "nama" => "Kopi", "harga" => 4000, "jumlah" => 2],
-    ["kode" => "A002", "nama" => "Mie Korea", "harga" => 3500, "jumlah" => 5],
-    ["kode" => "A003", "nama" => "Oreo", "harga" => 5000, "jumlah" => 4],
-    ["kode" => "A004", "nama" => "Yogurt", "harga" => 4500, "jumlah" => 6],
-    ["kode" => "A005", "nama" => "Lemineral", "harga" => 3200, "jumlah" => 3],
-];
-$static_grand = 0;
-foreach ($static_pembelian as $p) $static_grand += $p['harga'] * $p['jumlah'];
+
+$diskon = 0;
+$d = "0%";
+
+if ($grandtotal >= 100000) {
+    $diskon = 0.15 * $grandtotal;
+    $d = "15%";
+} elseif ($grandtotal >= 50000) {
+    $diskon = 0.10 * $grandtotal;
+    $d = "10%";
+} elseif ($grandtotal > 0) {
+    $diskon = 0.05 * $grandtotal;
+    $d = "5%";
+}
+
+$totalbayar = $grandtotal - $diskon;
+
+$barangData = [];
+$q = $conn->query("SELECT kode_barang, nama_barang, harga FROM barang");
+while ($r = $q->fetch_assoc()) {
+    $barangData[$r['kode_barang']] = [
+        'nama' => $r['nama_barang'],
+        'harga' => $r['harga']
+    ];
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="utf-8" />
-    <title>POLGAN MART</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Dashboard - POLGAN MART</title>
+
     <style>
-        body { background:#f3f6f9; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        .topbar { background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.05); padding:18px 28px; border-bottom:1px solid #eef2f6; }
-        .brand { display:flex; align-items:center; gap:12px; }
-        .brand img { width:56px; height:56px; border-radius:12px; object-fit:cover; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
-        .brand h4 { margin:0; font-weight:700; color:#222; }
-        .brand small { color:#6b7280; display:block; margin-top:2px; }
-        .userbox { text-align:right; }
-        .card-form { border-radius:12px; box-shadow: 0 6px 18px rgba(14,30,37,0.06); }
-        .table-custom th { background: #f8fafc; color:#333; border-top:0; }
-        .summary-row { background:#ffffff; font-weight:700; }
-        .summary-label { text-align:right; padding-right:20px; }
-        .btn-clear { background:#fff; border:1px solid #e6e9ef; color:#333; }
+        :root {
+            --bg: #f5f7fb;
+            --card: #fff;
+            --accent: #1f6feb;
+            --muted: #6b7280;
+            --border: #e6e9ef;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: Inter, Segoe UI, Arial;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            width: 56px;
+            height: 56px;
+            background: var(--accent);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--muted);
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .total-row td {
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: 0;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .btn-reset {
+            background: #ef4444;
+            color: #fff;
+            border: 0;
+            padding: 8px;
+            border-radius: 8px;
+        }
     </style>
 </head>
+
 <body>
-<div class="topbar d-flex justify-content-between align-items-center">
-    <div class="brand">
-        <img src="https://img.freepik.com/vektoren-premium/pm-logo_590037-69.jpg" alt="logo">
+<div class="container">
+    <header>
+        <div style="display:flex;gap:12px">
+            <div class="logo">PM</div>
+            <div>
+                <h3>POLGAN MART</h3>
+                <small>Sistem Penjualan</small>
+            </div>
+        </div>
         <div>
-            <h4 class="mb-0">POLGAN MART</h4>
-            <small>Sistem Penjualan Sederhana</small>
+            <b><?= $_SESSION['username'] ?></b><br>
+            <small><?= $_SESSION['role'] ?? '-' ?></small><br>
+            <a href="logout.php">Logout</a>
         </div>
-    </div>
-    <div class="userbox">
-        <div>Selamat datang, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong></div>
-        <div><small class="text-muted">Role: <?php echo htmlspecialchars($_SESSION['role'] ?? 'Admin'); ?></small></div>
-        <div class="mt-2">
-            <a href="logout.php" class="btn btn-outline-secondary btn-sm">Logout</a>
-        </div>
-    </div>
-</div>
-<div class="container my-4">
-    <div class="card card-form p-4 mb-4">
-        <div class="row">
-            <div class="col-md-7">
-                <h5 class="mb-3">Tambah Barang</h5>
-                <?php if (!empty($msg_error)): ?>
-                    <div class="alert alert-danger"><?= htmlspecialchars($msg_error) ?></div>
-                <?php endif; ?>
-                <form method="post" class="row g-3">
-                    <div class="col-12">
-                        <label class="form-label">Kode Barang</label>
-                        <input name="kode" class="form-control" placeholder="Masukkan Kode Barang" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Nama Barang</label>
-                        <input name="nama" class="form-control" placeholder="Masukkan Nama Barang" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Harga</label>
-                        <input name="harga" type="number" class="form-control" placeholder="Masukkan Harga" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Jumlah</label>
-                        <input name="jumlah" type="number" class="form-control" placeholder="Masukkan Jumlah" />
-                    </div>
-                    <div class="col-12">
-                        <button name="add_item" class="btn btn-primary">Tambahkan</button>
-                        <button name="cancel" class="btn btn-light btn-outline-secondary" formnovalidate>Batal</button>
-                    </div>
-                </form>
-            </div>
-            <div class="col-md-5">
-                <h5 class="mb-3 text-center">Daftar Pembelian</h5>
-                <div class="table-responsive">
-                    <table class="table table-borderless table-sm text-center">
-                        <thead class="table-custom">
-                            <tr>
-                                <th>Kode</th>
-                                <th>Nama</th>
-                                <th>Harga</th>
-                                <th>Jumlah</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php if (empty($cart)): ?>
-                            <tr><td colspan="5" class="text-muted">Keranjang kosong</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($cart as $it): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($it['kode']); ?></td>
-                                    <td><?php echo htmlspecialchars($it['nama']); ?></td>
-                                    <td>Rp <?php echo number_format($it['harga'],0,',','.'); ?></td>
-                                    <td><?php echo $it['jumlah']; ?></td>
-                                    <td>Rp <?php echo number_format($it['total'],0,',','.'); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-3">
-                    <table class="table table-borderless w-100">
-                        <tr>
-                            <td class="summary-label">Total Belanja</td>
-                            <td class="text-end">Rp <?php echo number_format($grandtotal,0,',','.'); ?></td>
-                        </tr>
-                        <tr>
-                            <td class="summary-label">Diskon (5%)</td>
-                            <td class="text-end">Rp <?php echo number_format($diskon,0,',','.'); ?></td>
-                        </tr>
-                        <tr class="summary-row">
-                            <td class="summary-label">Total Bayar</td>
-                            <td class="text-end">Rp <?php echo number_format($totalBayar,0,',','.'); ?></td>
-                        </tr>
-                    </table>
-                    <form method="post" class="d-inline">
-                        <button name="clear_cart" class="btn btn-outline-danger btn-sm">Kosongkan Keranjang</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="card p-3">
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Kode Barang</th>
-                        <th>Nama Barang</th>
-                        <th>Harga (Rp)</th>
-                        <th>Jumlah Beli</th>
-                        <th>Total (Rp)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php
-                $gt = 0;
-                foreach ($static_pembelian as $item) {
-                    $total = $item['harga'] * $item['jumlah'];
-                    $gt += $total;
-                    echo "<tr>";
-                    echo "<td>{$item['kode']}</td>";
-                    echo "<td>{$item['nama']}</td>";
-                    echo "<td>" . number_format($item['harga'],0,',','.') . "</td>";
-                    echo "<td>{$item['jumlah']}</td>";
-                    echo "<td>" . number_format($total,0,',','.') . "</td>";
-                    echo "</tr>";
-                }
-                ?>
-                <tr class="table-info" style="font-weight:700;">
-                    <td colspan="4" class="text-end">Grand Total</td>
-                    <td>Rp <?php echo number_format($gt,0,',','.'); ?></td>
+    </header>
+
+    <div class="card">
+        <?php foreach ($errors as $e): ?>
+            <p style="color:red"><?= $e ?></p>
+        <?php endforeach; ?>
+
+        <form method="post">
+            <label>Kode Barang</label>
+            <select id="kode" name="kode" required>
+                <option value="">-- pilih --</option>
+                <?php foreach ($barangData as $k => $v): ?>
+                    <option value="<?= $k ?>"><?= $k ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <label>Nama Barang</label>
+            <input type="text" id="nama" name="nama" readonly>
+
+            <label>Harga</label>
+            <input type="text" id="harga" name="harga" readonly>
+
+            <label>Jumlah</label>
+            <input type="number" name="jumlah" min="1" required>
+
+            <button class="btn">Tambah</button>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Kode</th>
+                    <th>Nama</th>
+                    <th>Harga</th>
+                    <th>Qty</th>
+                    <th class="right">Total</th>
+                    <th></th>
                 </tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-4 p-3" style="border:1px dashed #dbe6f0; background:#fff;">
-            <h6 style="text-align:center;"> STRUK PEMBELIAN </h6>
-            <p>Tanggal : <?php echo date("d-m-Y H:i:s"); ?><br>
-            Kasir   : <?php echo htmlspecialchars($_SESSION['username']); ?></p>
-            <hr>
-            <?php foreach ($static_pembelian as $p): 
-                $t = $p['harga'] * $p['jumlah'];
-                echo "<div>{$p['nama']} ({$p['jumlah']} x Rp " . number_format($p['harga'],0,',','.') . ") = Rp " . number_format($t,0,',','.') . "</div>";
-            endforeach; ?>
-            <hr>
-            <div style="text-align:right; font-weight:700;">Total Belanja : Rp <?php echo number_format($static_grand,0,',','.'); ?></div>
-            <p class="mt-3" style="text-align:center;">Terima Kasih Telah Berbelanja di POLGAN MART!</p>
-        </div>
+            </thead>
+            <tbody>
+            <?php foreach ($_SESSION['cart'] as $i => $c): ?>
+                <tr>
+                    <td><?= $c['kode'] ?></td>
+                    <td><?= $c['nama'] ?></td>
+                    <td>Rp <?= number_format($c['harga']) ?></td>
+                    <td><?= $c['jumlah'] ?></td>
+                    <td class="right">Rp <?= number_format($c['lineTotal']) ?></td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="hapus_index" value="<?= $i ?>">
+                            <button class="btn-reset">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+
+            <tr class="total-row">
+                <td colspan="4" class="right">Total</td>
+                <td class="right">Rp <?= number_format($grandtotal) ?></td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="4" class="right">Diskon (<?= $d ?>)</td>
+                <td class="right">Rp <?= number_format($diskon) ?></td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="4" class="right">Total Bayar</td>
+                <td class="right">Rp <?= number_format($totalbayar) ?></td>
+            </tr>
+            </tbody>
+        </table>
+
+        <form method="post">
+            <button name="clear_cart" class="btn-reset">Kosongkan</button>
+        </form>
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const barangData = <?= json_encode($barangData); ?>;
+const kode = document.getElementById('kode');
+const nama = document.getElementById('nama');
+const harga = document.getElementById('harga');
+
+kode.addEventListener('change', function () {
+    if (barangData[this.value]) {
+        nama.value = barangData[this.value].nama;
+        harga.value = barangData[this.value].harga;
+    } else {
+        nama.value = '';
+        harga.value = '';
+    }
+});
+</script>
 </body>
 </html>
